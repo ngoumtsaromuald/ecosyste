@@ -1,0 +1,228 @@
+{
+  "name": "Douala Business Directory Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://www.go.cm/douala/entreprises",
+        "options": {
+          "timeout": 30000,
+          "followRedirect": true,
+          "allowUnauthorizedCerts": false
+        },
+        "authentication": "none"
+      },
+      "id": "start-douala-scraper",
+      "name": "Fetch Douala Directory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [240, 300],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse HTML and extract Douala business data\nconst cheerio = require('cheerio');\nconst html = $input.first().json.data;\nconst $ = cheerio.load(html);\n\nconst businesses = [];\n\n// Extract business listings (adapt selectors for go.cm structure)\n$('.business-listing').each((index, element) => {\n  const $el = $(element);\n  \n  const business = {\n    name: $el.find('.business-name').first().text().trim(),\n    description: $el.find('.business-description').first().text().trim(),\n    phone: extractPhone($el.find('.business-contact').text()),\n    email: extractEmail($el.find('.business-contact').text()),\n    address: $el.find('.business-address').text().trim(),\n    website: $el.find('.business-website').attr('href') || '',\n    category: $el.find('.business-category').text().trim(),\n    city: 'Douala',\n    region: 'Littoral', \n    country: 'CM',\n    source: 'go.cm',\n    scraped_at: new Date().toISOString()\n  };\n\n  // Only add if we have at least name and one contact method\n  if (business.name && (business.phone || business.email || business.address)) {\n    businesses.push(business);\n  }\n});\n\n// Helper functions \nfunction extractPhone(text) {\n  const phoneRegex = /(?:\\+237|237)?\\s*[6-9]\\d{8}/g;\n  const matches = text.match(phoneRegex);\n  if (!matches) return '';\n  return matches[0].replace(/\\s+/g, '').replace(/^(?!\\+)/, '+237');\n}\n\nfunction extractEmail(text) {\n  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g;\n  const matches = text.match(emailRegex); \n  return matches ? matches[0].toLowerCase() : '';\n}\n\nreturn businesses.map(business => ({ json: business }));"
+      },
+      "id": "parse-douala-html",
+      "name": "Parse Douala Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enhanced data cleaning for Douala businesses\nconst business = $input.first().json;\n\n// Normalize phone number for Cameroon\nif (business.phone) {\n  business.phone = business.phone.replace(/[^\\d+]/g, '');\n  if (business.phone.startsWith('6') || business.phone.startsWith('7')) {\n    business.phone = '+237' + business.phone;\n  }\n}\n\n// Clean and format business name\nif (business.name) {\n  business.name = business.name.replace(/\\s+/g, ' ').trim();\n  // Capitalize first letter of each word\n  business.name = business.name.replace(/\\w\\S*/g, (txt) => \n    txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()\n  );\n}\n\n// Normalize email\nif (business.email) {\n  business.email = business.email.toLowerCase().trim();\n}\n\n// Map common French categories to English\nconst categoryMap = {\n  'commerce': 'Commerce',\n  'services': 'Services',\n  'industrie': 'Industry',\n  'transport': 'Transportation',\n  'restauration': 'Restaurant',\n  'hôtellerie': 'Hospitality',\n  'santé': 'Healthcare',\n  'éducation': 'Education',\n  'banque': 'Banking',\n  'assurance': 'Insurance'\n};\n\nif (business.category) {\n  const lowerCategory = business.category.toLowerCase();\n  business.category = categoryMap[lowerCategory] || business.category;\n} else {\n  business.category = 'Services';\n}\n\n// Add Douala-specific metadata\nbusiness.status = 'PENDING';\nbusiness.verified = false;\nbusiness.featured = false;\nbusiness.latitude = 4.0511; // Douala approximate coordinates\nbusiness.longitude = 9.7679;\n\nreturn { json: business };"
+      },
+      "id": "normalize-douala-data",
+      "name": "Normalize Douala Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "validate-name",
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "validate-contact",
+              "leftValue": "={{ $json.phone || $json.email || $json.address }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "validate-douala-business",
+      "name": "Validate Business",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:3001/v1/businesses/ingest",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "httpHeaderAuth": {
+          "name": "X-API-Key",
+          "value": "your-n8n-api-key-here"
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "method": "POST"
+      },
+      "id": "send-douala-to-api",
+      "name": "Send to RomAPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 240],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "message": "📍 Douala business processed: {{ $json.name }} - Status: {{ $json.statusCode }}",
+        "options": {}
+      },
+      "id": "log-douala-result",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1340, 240],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "douala-rate-limit",
+      "name": "Rate Limit (3s)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1560, 240],
+      "executeOnce": false
+    }
+  ],
+  "connections": {
+    "start-douala-scraper": {
+      "main": [
+        [
+          {
+            "node": "parse-douala-html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse-douala-html": {
+      "main": [
+        [
+          {
+            "node": "normalize-douala-data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "normalize-douala-data": {
+      "main": [
+        [
+          {
+            "node": "validate-douala-business",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-douala-business": {
+      "main": [
+        [
+          {
+            "node": "send-douala-to-api",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send-douala-to-api": {
+      "main": [
+        [
+          {
+            "node": "log-douala-result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log-douala-result": {
+      "main": [
+        [
+          {
+            "node": "douala-rate-limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "douala-business-scraper",
+  "tags": [
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "scraping",
+      "name": "scraping"
+    },
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "douala",
+      "name": "douala"
+    }
+  ]
+}

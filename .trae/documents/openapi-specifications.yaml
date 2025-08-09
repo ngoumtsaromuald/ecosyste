@@ -1,0 +1,1693 @@
+openapi: 3.0.3
+info:
+  title: RomAPI - Écosystème d'API Commercial Cameroun
+  description: |
+    API complète pour l'écosystème RomAPI qui centralise les ressources et services locaux du Cameroun.
+    
+    ## Authentification
+    
+    L'API utilise deux méthodes d'authentification :
+    - **API Key** : Pour les intégrations tierces (header `X-API-Key`)
+    - **Bearer Token** : Pour les utilisateurs authentifiés (header `Authorization: Bearer <token>`)
+    
+    ## Rate Limiting
+    
+    Les limites de taux dépendent de votre plan :
+    - **Free** : 1,000 requêtes/mois
+    - **Pro** : 50,000 requêtes/mois  
+    - **Enterprise** : 500,000 requêtes/mois
+    
+    ## Formats Locaux
+    
+    - **Téléphone** : Format international (+237XXXXXXXXX) ou local (6XXXXXXXX)
+    - **Adresse** : Formats camerounais avec régions et départements
+    - **Fuseau horaire** : Africa/Douala (UTC+1)
+    
+  version: 1.0.0
+  contact:
+    name: RomAPI Support
+    email: support@romapi.cm
+    url: https://romapi.cm
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.romapi.cm/v1
+    description: Production server
+  - url: https://staging-api.romapi.cm/v1
+    description: Staging server
+  - url: http://localhost:3000/v1
+    description: Development server
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+paths:
+  # Authentication Endpoints
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Connexion utilisateur
+      description: Authentifie un utilisateur et retourne un token JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "romuald@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "motdepasse123"
+      responses:
+        '200':
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  refresh_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Inscription utilisateur
+      description: Crée un nouveau compte utilisateur
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                  example: "Romuald Kamga"
+                email:
+                  type: string
+                  format: email
+                  example: "romuald@example.com"
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: "motdepasse123"
+                role:
+                  type: string
+                  enum: [user, business]
+                  default: user
+                  example: "business"
+      responses:
+        '201':
+          description: Inscription réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Compte créé avec succès"
+                  user:
+                    $ref: '#/components/schemas/User'
+        '409':
+          description: Email déjà utilisé
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Renouveler le token
+      description: Renouvelle le token d'accès avec le refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: Token renouvelé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Business Endpoints
+  /businesses:
+    get:
+      tags:
+        - Businesses
+      summary: Liste des entreprises
+      description: Récupère la liste des entreprises avec filtres et pagination
+      parameters:
+        - name: page
+          in: query
+          description: Numéro de page (commence à 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Nombre d'éléments par page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: category
+          in: query
+          description: Filtrer par catégorie (ID ou slug)
+          schema:
+            type: string
+            example: "restaurants"
+        - name: city
+          in: query
+          description: Filtrer par ville
+          schema:
+            type: string
+            example: "Douala"
+        - name: region
+          in: query
+          description: Filtrer par région
+          schema:
+            type: string
+            example: "Littoral"
+        - name: lat
+          in: query
+          description: Latitude pour recherche géographique
+          schema:
+            type: number
+            format: float
+            example: 4.0511
+        - name: lng
+          in: query
+          description: Longitude pour recherche géographique
+          schema:
+            type: number
+            format: float
+            example: 9.7679
+        - name: radius
+          in: query
+          description: Rayon de recherche en km (avec lat/lng)
+          schema:
+            type: number
+            format: float
+            minimum: 0.1
+            maximum: 100
+            default: 10
+        - name: plan
+          in: query
+          description: Filtrer par plan d'abonnement
+          schema:
+            type: string
+            enum: [free, premium, featured]
+        - name: verified
+          in: query
+          description: Filtrer par statut de vérification
+          schema:
+            type: boolean
+        - name: sort
+          in: query
+          description: Critère de tri
+          schema:
+            type: string
+            enum: [name, created_at, updated_at, distance, plan]
+            default: plan
+        - name: order
+          in: query
+          description: Ordre de tri
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Liste des entreprises
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Business'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimit'
+
+    post:
+      tags:
+        - Businesses
+      summary: Créer une entreprise
+      description: Crée une nouvelle entreprise (authentification requise)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessCreate'
+      responses:
+        '201':
+          description: Entreprise créée avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Entreprise créée avec succès"
+                  data:
+                    $ref: '#/components/schemas/Business'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /businesses/{id}:
+    get:
+      tags:
+        - Businesses
+      summary: Détails d'une entreprise
+      description: Récupère les détails complets d'une entreprise
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de l'entreprise
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Détails de l'entreprise
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BusinessDetailed'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimit'
+
+    put:
+      tags:
+        - Businesses
+      summary: Modifier une entreprise
+      description: Modifie une entreprise existante (propriétaire uniquement)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de l'entreprise
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessUpdate'
+      responses:
+        '200':
+          description: Entreprise modifiée avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Entreprise modifiée avec succès"
+                  data:
+                    $ref: '#/components/schemas/Business'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      tags:
+        - Businesses
+      summary: Supprimer une entreprise
+      description: Supprime une entreprise (propriétaire uniquement)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de l'entreprise
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Entreprise supprimée avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Entreprise supprimée avec succès"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /businesses/ingest:
+    post:
+      tags:
+        - Businesses
+      summary: Ingestion de données (n8n)
+      description: Endpoint pour l'ingestion automatique de données via n8n
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source:
+                  type: string
+                  description: Source des données
+                  example: "pages-jaunes-cm"
+                source_url:
+                  type: string
+                  format: uri
+                  description: URL source des données
+                  example: "https://www.pagesjaunes.cm/restaurants-douala"
+                businesses:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/BusinessIngest'
+      responses:
+        '200':
+          description: Données ingérées avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Données ingérées avec succès"
+                  processed:
+                    type: integer
+                    example: 25
+                  created:
+                    type: integer
+                    example: 20
+                  updated:
+                    type: integer
+                    example: 5
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        business_name:
+                          type: string
+                        error:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # Search Endpoints
+  /search:
+    get:
+      tags:
+        - Search
+      summary: Recherche d'entreprises
+      description: Recherche textuelle avancée dans les entreprises
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Terme de recherche
+          schema:
+            type: string
+            example: "restaurant pizza douala"
+        - name: category
+          in: query
+          description: Filtrer par catégorie
+          schema:
+            type: string
+            example: "restaurants"
+        - name: location
+          in: query
+          description: Filtrer par localisation
+          schema:
+            type: string
+            example: "Douala"
+        - name: lat
+          in: query
+          description: Latitude pour recherche géographique
+          schema:
+            type: number
+            format: float
+        - name: lng
+          in: query
+          description: Longitude pour recherche géographique
+          schema:
+            type: number
+            format: float
+        - name: radius
+          in: query
+          description: Rayon de recherche en km
+          schema:
+            type: number
+            format: float
+            default: 10
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Résultats de recherche
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BusinessSearchResult'
+                  meta:
+                    allOf:
+                      - $ref: '#/components/schemas/PaginationMeta'
+                      - type: object
+                        properties:
+                          query:
+                            type: string
+                            example: "restaurant pizza douala"
+                          total_results:
+                            type: integer
+                            example: 156
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimit'
+
+  /search/suggestions:
+    get:
+      tags:
+        - Search
+      summary: Suggestions de recherche
+      description: Auto-complétion pour la recherche
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Début du terme de recherche
+          schema:
+            type: string
+            minLength: 2
+            example: "rest"
+        - name: limit
+          in: query
+          description: Nombre de suggestions
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 5
+      responses:
+        '200':
+          description: Suggestions de recherche
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        text:
+                          type: string
+                          example: "restaurant"
+                        type:
+                          type: string
+                          enum: [business, category, location]
+                          example: "category"
+                        count:
+                          type: integer
+                          example: 245
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # Categories Endpoints
+  /categories:
+    get:
+      tags:
+        - Categories
+      summary: Liste des catégories
+      description: Récupère toutes les catégories d'entreprises
+      parameters:
+        - name: parent_id
+          in: query
+          description: Filtrer par catégorie parent
+          schema:
+            type: string
+            format: uuid
+        - name: level
+          in: query
+          description: Niveau hiérarchique (0 = racine)
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 3
+      responses:
+        '200':
+          description: Liste des catégories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+        '429':
+          $ref: '#/components/responses/RateLimit'
+
+  /categories/{id}:
+    get:
+      tags:
+        - Categories
+      summary: Détails d'une catégorie
+      description: Récupère les détails d'une catégorie avec ses sous-catégories
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID ou slug de la catégorie
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Détails de la catégorie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CategoryDetailed'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # Analytics Endpoints
+  /analytics/track:
+    post:
+      tags:
+        - Analytics
+      summary: Tracker un événement
+      description: Enregistre un événement analytics (vue, clic, contact)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - business_id
+                - event_type
+              properties:
+                business_id:
+                  type: string
+                  format: uuid
+                event_type:
+                  type: string
+                  enum: [view, click, contact, call, website_visit]
+                  example: "view"
+                metadata:
+                  type: object
+                  description: Données additionnelles
+                  example:
+                    source: "search"
+                    query: "restaurant douala"
+      responses:
+        '200':
+          description: Événement enregistré
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Événement enregistré"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /analytics/dashboard/{business_id}:
+    get:
+      tags:
+        - Analytics
+      summary: Dashboard analytics entreprise
+      description: Statistiques détaillées pour une entreprise (propriétaire uniquement)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: business_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: period
+          in: query
+          description: Période d'analyse
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, 1y]
+            default: 30d
+      responses:
+        '200':
+          description: Statistiques de l'entreprise
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BusinessAnalytics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # User Management
+  /users/me:
+    get:
+      tags:
+        - Users
+      summary: Profil utilisateur
+      description: Récupère le profil de l'utilisateur connecté
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profil utilisateur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - Users
+      summary: Modifier le profil
+      description: Modifie le profil de l'utilisateur connecté
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Romuald Kamga"
+                phone:
+                  type: string
+                  example: "+237690123456"
+                company:
+                  type: string
+                  example: "Tech Solutions CM"
+      responses:
+        '200':
+          description: Profil modifié avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Profil modifié avec succès"
+                  data:
+                    $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # API Key Management
+  /api-keys:
+    get:
+      tags:
+        - API Keys
+      summary: Liste des clés API
+      description: Récupère les clés API de l'utilisateur
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste des clés API
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiKey'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - API Keys
+      summary: Créer une clé API
+      description: Génère une nouvelle clé API
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: "Mon App Mobile"
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                    enum: [read, write, analytics]
+                  example: ["read"]
+      responses:
+        '201':
+          description: Clé API créée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Clé API créée avec succès"
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/ApiKey'
+                      - type: object
+                        properties:
+                          key:
+                            type: string
+                            description: "Clé complète (visible une seule fois)"
+                            example: "romapi_live_1234567890abcdef"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api-keys/{id}:
+    delete:
+      tags:
+        - API Keys
+      summary: Supprimer une clé API
+      description: Révoque une clé API
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Clé API supprimée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Clé API supprimée avec succès"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # Health Check
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Vérification de l'état du système
+      security: []
+      responses:
+        '200':
+          description: Système opérationnel
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: "ok"
+                      redis:
+                        type: string
+                        example: "ok"
+                      elasticsearch:
+                        type: string
+                        example: "ok"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        Clé API pour l'authentification. Format: `romapi_live_xxxxxxxxxxxxxxxx`
+        
+        Obtenez votre clé API depuis votre dashboard utilisateur.
+    
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Token JWT obtenu via l'endpoint `/auth/login`.
+        
+        Format: `Authorization: Bearer <token>`
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        name:
+          type: string
+          example: "Romuald Kamga"
+        email:
+          type: string
+          format: email
+          example: "romuald@example.com"
+        role:
+          type: string
+          enum: [user, business, admin]
+          example: "business"
+        plan:
+          type: string
+          enum: [free, pro, enterprise]
+          example: "pro"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+
+    UserProfile:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            phone:
+              type: string
+              example: "+237690123456"
+            company:
+              type: string
+              example: "Tech Solutions CM"
+            api_quota:
+              type: integer
+              example: 50000
+            api_usage:
+              type: integer
+              example: 12450
+            businesses_count:
+              type: integer
+              example: 3
+
+    Business:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        name:
+          type: string
+          example: "Restaurant Le Palmier"
+        slug:
+          type: string
+          example: "restaurant-le-palmier-douala"
+        description:
+          type: string
+          example: "Restaurant traditionnel camerounais au cœur de Douala"
+        category:
+          $ref: '#/components/schemas/Category'
+        address:
+          $ref: '#/components/schemas/Address'
+        contact:
+          $ref: '#/components/schemas/Contact'
+        status:
+          type: string
+          enum: [active, pending, suspended]
+          example: "active"
+        plan:
+          type: string
+          enum: [free, premium, featured]
+          example: "premium"
+        verified:
+          type: boolean
+          example: true
+        primary_image:
+          type: string
+          format: uri
+          example: "https://cdn.romapi.cm/images/business-123.jpg"
+        rating:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 5
+          example: 4.2
+        reviews_count:
+          type: integer
+          example: 28
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-01-20T14:45:00Z"
+
+    BusinessDetailed:
+      allOf:
+        - $ref: '#/components/schemas/Business'
+        - type: object
+          properties:
+            hours:
+              type: array
+              items:
+                $ref: '#/components/schemas/BusinessHour'
+            images:
+              type: array
+              items:
+                $ref: '#/components/schemas/BusinessImage'
+            owner:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Jean Dupont"
+                verified:
+                  type: boolean
+                  example: true
+            analytics:
+              type: object
+              properties:
+                views_count:
+                  type: integer
+                  example: 1250
+                clicks_count:
+                  type: integer
+                  example: 89
+                contacts_count:
+                  type: integer
+                  example: 23
+
+    BusinessCreate:
+      type: object
+      required:
+        - name
+        - category_id
+        - address
+        - contact
+      properties:
+        name:
+          type: string
+          example: "Restaurant Le Palmier"
+        description:
+          type: string
+          example: "Restaurant traditionnel camerounais"
+        category_id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        address:
+          $ref: '#/components/schemas/AddressCreate'
+        contact:
+          $ref: '#/components/schemas/ContactCreate'
+        hours:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusinessHourCreate'
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+            example: "https://example.com/image.jpg"
+
+    BusinessUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        address:
+          $ref: '#/components/schemas/AddressCreate'
+        contact:
+          $ref: '#/components/schemas/ContactCreate'
+        hours:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusinessHourCreate'
+
+    BusinessIngest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "Restaurant Le Palmier"
+        description:
+          type: string
+        category:
+          type: string
+          example: "Restaurants"
+        address_line1:
+          type: string
+          example: "123 Rue de la Liberté"
+        city:
+          type: string
+          example: "Douala"
+        region:
+          type: string
+          example: "Littoral"
+        phone:
+          type: string
+          example: "+237690123456"
+        email:
+          type: string
+          format: email
+        website:
+          type: string
+          format: uri
+        source_id:
+          type: string
+          description: "ID unique dans la source"
+          example: "pj_12345"
+
+    BusinessSearchResult:
+      allOf:
+        - $ref: '#/components/schemas/Business'
+        - type: object
+          properties:
+            distance:
+              type: number
+              format: float
+              description: "Distance en km (si recherche géographique)"
+              example: 2.5
+            relevance_score:
+              type: number
+              format: float
+              description: "Score de pertinence (0-1)"
+              example: 0.85
+            highlighted_fields:
+              type: object
+              description: "Champs avec mise en évidence des termes recherchés"
+              properties:
+                name:
+                  type: string
+                  example: "<em>Restaurant</em> Le Palmier"
+                description:
+                  type: string
+                  example: "<em>Restaurant</em> traditionnel camerounais"
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        name:
+          type: string
+          example: "Restaurants"
+        slug:
+          type: string
+          example: "restaurants"
+        description:
+          type: string
+          example: "Restaurants et établissements de restauration"
+        icon:
+          type: string
+          example: "restaurant"
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        businesses_count:
+          type: integer
+          example: 245
+        created_at:
+          type: string
+          format: date-time
+
+    CategoryDetailed:
+      allOf:
+        - $ref: '#/components/schemas/Category'
+        - type: object
+          properties:
+            children:
+              type: array
+              items:
+                $ref: '#/components/schemas/Category'
+            parent:
+              $ref: '#/components/schemas/Category'
+              nullable: true
+
+    Address:
+      type: object
+      properties:
+        address_line1:
+          type: string
+          example: "123 Rue de la Liberté"
+        address_line2:
+          type: string
+          example: "Quartier Bonanjo"
+        city:
+          type: string
+          example: "Douala"
+        region:
+          type: string
+          example: "Littoral"
+        postal_code:
+          type: string
+          example: "1234"
+        country:
+          type: string
+          example: "CM"
+        latitude:
+          type: number
+          format: float
+          example: 4.0511
+        longitude:
+          type: number
+          format: float
+          example: 9.7679
+
+    AddressCreate:
+      type: object
+      required:
+        - address_line1
+        - city
+        - region
+      properties:
+        address_line1:
+          type: string
+          example: "123 Rue de la Liberté"
+        address_line2:
+          type: string
+          example: "Quartier Bonanjo"
+        city:
+          type: string
+          example: "Douala"
+        region:
+          type: string
+          example: "Littoral"
+        postal_code:
+          type: string
+          example: "1234"
+        country:
+          type: string
+          default: "CM"
+          example: "CM"
+
+    Contact:
+      type: object
+      properties:
+        phone:
+          type: string
+          example: "+237690123456"
+        email:
+          type: string
+          format: email
+          example: "contact@restaurant-palmier.cm"
+        website:
+          type: string
+          format: uri
+          example: "https://restaurant-palmier.cm"
+
+    ContactCreate:
+      type: object
+      properties:
+        phone:
+          type: string
+          pattern: '^(\+237)?[0-9]{9}$'
+          example: "+237690123456"
+        email:
+          type: string
+          format: email
+          example: "contact@restaurant-palmier.cm"
+        website:
+          type: string
+          format: uri
+          example: "https://restaurant-palmier.cm"
+
+    BusinessHour:
+      type: object
+      properties:
+        day_of_week:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: "0 = Dimanche, 1 = Lundi, ..., 6 = Samedi"
+          example: 1
+        open_time:
+          type: string
+          format: time
+          example: "08:00"
+        close_time:
+          type: string
+          format: time
+          example: "22:00"
+        is_closed:
+          type: boolean
+          example: false
+
+    BusinessHourCreate:
+      type: object
+      required:
+        - day_of_week
+      properties:
+        day_of_week:
+          type: integer
+          minimum: 0
+          maximum: 6
+        open_time:
+          type: string
+          format: time
+          example: "08:00"
+        close_time:
+          type: string
+          format: time
+          example: "22:00"
+        is_closed:
+          type: boolean
+          default: false
+
+    BusinessImage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+          example: "https://cdn.romapi.cm/images/business-123-1.jpg"
+        alt_text:
+          type: string
+          example: "Façade du restaurant Le Palmier"
+        is_primary:
+          type: boolean
+          example: true
+        order_index:
+          type: integer
+          example: 0
+
+    BusinessAnalytics:
+      type: object
+      properties:
+        period:
+          type: string
+          example: "30d"
+        total_views:
+          type: integer
+          example: 1250
+        total_clicks:
+          type: integer
+          example: 89
+        total_contacts:
+          type: integer
+          example: 23
+        views_by_day:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+                example: "2024-01-15"
+              views:
+                type: integer
+                example: 42
+        top_sources:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                type: string
+                example: "search"
+              count:
+                type: integer
+                example: 156
+        top_queries:
+          type: array
+          items:
+            type: object
+            properties:
+              query:
+                type: string
+                example: "restaurant douala"
+              count:
+                type: integer
+                example: 45
+
+    ApiKey:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Mon App Mobile"
+        key_prefix:
+          type: string
+          example: "romapi_live_1234"
+        permissions:
+          type: array
+          items:
+            type: string
+            enum: [read, write, analytics]
+        rate_limit:
+          type: integer
+          example: 1000
+        is_active:
+          type: boolean
+          example: true
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 156
+        total_pages:
+          type: integer
+          example: 8
+        has_next_page:
+          type: boolean
+          example: true
+        has_prev_page:
+          type: boolean
+          example: false
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Validation failed"
+        message:
+          type: string
+          example: "Les données fournies ne sont pas valides"
+        details:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+          example: "/v1/businesses"
+
+  responses:
+    BadRequest:
+      description: Requête invalide
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Bad Request"
+            message: "Paramètres de requête invalides"
+            timestamp: "2024-01-15T10:30:00Z"
+            path: "/v1/businesses"
+
+    Unauthorized:
+      description: Non autorisé - Token manquant ou invalide
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Unauthorized"
+            message: "Token d'authentification requis"
+            timestamp: "2024-01-15T10:30:00Z"
+            path: "/v1/businesses"
+
+    Forbidden:
+      description: Accès interdit - Permissions insuffisantes
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Forbidden"
+            message: "Vous n'avez pas les permissions pour cette action"
+            timestamp: "2024-01-15T10:30:00Z"
+            path: "/v1/businesses/123"
+
+    NotFound:
+      description: Ressource non trouvée
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Not Found"
+            message: "Entreprise non trouvée"
+            timestamp: "2024-01-15T10:30:00Z"
+            path: "/v1/businesses/123"
+
+    ValidationError:
+      description: Erreur de validation des données
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - type: object
+                properties:
+                  details:
+                    type: object
+                    properties:
+                      fields:
+                        type: object
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+          example:
+            error: "Validation Error"
+            message: "Les données fournies ne sont pas valides"
+            details:
+              fields:
+                name: ["Le nom est requis"]
+                email: ["Format d'email invalide"]
+            timestamp: "2024-01-15T10:30:00Z"
+            path: "/v1/businesses"
+
+    RateLimit:
+      description: Limite de taux dépassée
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - type: object
+                properties:
+                  details:
+                    type: object
+                    properties:
+                      limit:
+                        type: integer
+                        example: 1000
+                      remaining:
+                        type: integer
+                        example: 0
+                      reset_at:
+                        type: string
+                        format: date-time
+                        example: "2024-01-15T11:00:00Z"
+          example:
+            error: "Rate Limit Exceeded"
+            message: "Limite de requêtes dépassée"
+            details:
+              limit: 1000
+              remaining: 0
+              reset_at: "2024-01-15T11:00:00Z"
+            timestamp: "2024-01-15T10:30:00Z"
+            path: "/v1/businesses"
+
+tags:
+  - name: Authentication
+    description: Gestion de l'authentification et des sessions
+  - name: Businesses
+    description: Gestion des entreprises et listings
+  - name: Search
+    description: Recherche et suggestions
+  - name: Categories
+    description: Gestion des catégories d'entreprises
+  - name: Analytics
+    description: Suivi et statistiques
+  - name: Users
+    description: Gestion des profils utilisateurs
+  - name: API Keys
+    description: Gestion des clés d'API
+  - name: System
+    description: Endpoints système et monitoring

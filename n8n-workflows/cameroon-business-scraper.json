@@ -1,0 +1,290 @@
+{
+  "name": "Cameroon Business Directory Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://www.pagesjaunes.cm/recherche/entreprises",
+        "options": {
+          "timeout": 30000,
+          "followRedirect": true,
+          "allowUnauthorizedCerts": false
+        },
+        "authentication": "none"
+      },
+      "id": "start-scraper",
+      "name": "Fetch Business Directory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [240, 300],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse HTML and extract business data\nconst cheerio = require('cheerio');\nconst html = $input.first().json.data;\nconst $ = cheerio.load(html);\n\nconst businesses = [];\n\n// Extract business listings\n$('.listing').each((index, element) => {\n  const $el = $(element);\n  \n  const business = {\n    name: $el.find('.name').first().text().trim(),\n    description: $el.find('.description').first().text().trim(),\n    phone: extractPhone($el.find('.phone').text()),\n    email: extractEmail($el.find('.email').text()),\n    address: $el.find('.address').text().trim(),\n    website: $el.find('.website').attr('href') || '',\n    category: $el.find('.category').text().trim(),\n    city: extractCity($el.find('.address').text()) || 'Yaoundé',\n    region: extractRegion($el.find('.address').text()) || 'Centre',\n    country: 'CM',\n    source: 'pagesjaunes.cm',\n    scraped_at: new Date().toISOString()\n  };\n  \n  // Only add if we have at least name and one contact method\n  if (business.name && (business.phone || business.email || business.address)) {\n    businesses.push(business);\n  }\n});\n\n// Helper functions\nfunction extractPhone(text) {\n  const phoneRegex = /(?:\\+237|237)?\\s*[6-9]\\d{8}/g;\n  const matches = text.match(phoneRegex);\n  if (!matches) return '';\n  return matches.map(phone => {\n    phone = phone.replace(/\\s+/g, '');\n    if (!phone.startsWith('+')) {\n      phone = '+237' + phone.replace(/^237/, '');\n    }\n    return phone;\n  }).join(', ');\n}\n\nfunction extractEmail(text) {\n  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g;\n  const matches = text.match(emailRegex);\n  return matches ? matches.join(', ') : '';\n}\n\nfunction extractCity(address) {\n  const cities = ['Yaoundé', 'Douala', 'Bafoussam', 'Bamenda', 'Garoua'];\n  const found = cities.find(city => address.includes(city));\n  return found || '';\n}\n\nfunction extractRegion(address) {\n  const regions = {\n    'Yaoundé': 'Centre',\n    'Douala': 'Littoral',\n    'Bafoussam': 'Ouest',\n    'Bamenda': 'Nord-Ouest',\n    'Garoua': 'Nord'\n  };\n  const city = extractCity(address);\n  return regions[city] || '';\n}\n\nreturn businesses.map(business => ({ json: business }));"
+      },
+      "id": "parse-html",
+      "name": "Parse Business Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "validate-data",
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "validate-business",
+      "name": "Validate Business Data",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Clean and normalize business data\nconst business = $input.first().json;\n\n// Normalize phone number\nif (business.phone) {\n  business.phone = business.phone.replace(/[^\\d+]/g, '');\n  if (business.phone.startsWith('6') || business.phone.startsWith('7')) {\n    business.phone = '+237' + business.phone;\n  }\n}\n\n// Clean and capitalize name\nif (business.name) {\n  business.name = business.name.replace(/\\s+/g, ' ').trim();\n  business.name = business.name.charAt(0).toUpperCase() + business.name.slice(1).toLowerCase();\n}\n\n// Normalize email\nif (business.email) {\n  business.email = business.email.toLowerCase().trim();\n}\n\n// Set default category if empty\nif (!business.category) {\n  business.category = 'Services';\n}\n\n// Add metadata\nbusiness.status = 'PENDING';\nbusiness.verified = false;\nbusiness.featured = false;\n\nreturn { json: business };"
+      },
+      "id": "normalize-data",
+      "name": "Normalize Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 240],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:3001/v1/businesses/ingest",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "httpHeaderAuth": {
+          "name": "X-API-Key",
+          "value": "your-n8n-api-key-here"
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "method": "POST"
+      },
+      "id": "send-to-api",
+      "name": "Send to RomAPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 240],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-success",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 201,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-response",
+      "name": "Check API Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 240],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "message": "✅ Business successfully added: {{ $json.data.name }}",
+        "options": {}
+      },
+      "id": "log-success",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1560, 160],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "message": "❌ Failed to add business: {{ $json.error || 'Unknown error' }}",
+        "options": {}
+      },
+      "id": "log-error",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1560, 320],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "rate-limit",
+      "name": "Rate Limit (2s)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1780, 240],
+      "executeOnce": false
+    }
+  ],
+  "connections": {
+    "start-scraper": {
+      "main": [
+        [
+          {
+            "node": "parse-html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse-html": {
+      "main": [
+        [
+          {
+            "node": "validate-business",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-business": {
+      "main": [
+        [
+          {
+            "node": "normalize-data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "normalize-data": {
+      "main": [
+        [
+          {
+            "node": "send-to-api",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send-to-api": {
+      "main": [
+        [
+          {
+            "node": "check-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-response": {
+      "main": [
+        [
+          {
+            "node": "log-success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "log-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log-success": {
+      "main": [
+        [
+          {
+            "node": "rate-limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log-error": {
+      "main": [
+        [
+          {
+            "node": "rate-limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "cameroon-business-scraper",
+  "tags": [
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "scraping",
+      "name": "scraping"
+    },
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "cameroon",
+      "name": "cameroon"
+    }
+  ]
+}

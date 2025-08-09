@@ -1,0 +1,220 @@
+// Schéma Prisma pour RomAPI - Écosystème d'API Commercial Cameroun
+// Documentation: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== MODÈLES UTILISATEURS =====
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      UserRole @default(USER)
+  avatar    String?
+  phone     String?
+  
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  businesses Business[]
+  apiKeys    ApiKey[]
+  
+  @@map("users")
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  name        String
+  userId      String
+  plan        ApiPlan   @default(FREE)
+  isActive    Boolean   @default(true)
+  lastUsedAt  DateTime?
+  
+  // Limites
+  monthlyQuota     Int      @default(1000)
+  monthlyUsage     Int      @default(0)
+  quotaResetDate   DateTime @default(now())
+  
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("api_keys")
+}
+
+// ===== MODÈLES BUSINESS =====
+
+model Business {
+  id          String        @id @default(cuid())
+  name        String
+  slug        String        @unique
+  description String?
+  
+  // Informations de contact
+  email       String?
+  phone       String?
+  website     String?
+  
+  // Adresse (format Cameroun)
+  address     String?
+  city        String?
+  region      String?
+  department  String?
+  postalCode  String?
+  
+  // Géolocalisation
+  latitude    Float?
+  longitude   Float?
+  
+  // Médias
+  logo        String?
+  images      String[]  @default([])
+  
+  // Business
+  categoryId  String
+  status      BusinessStatus @default(PENDING)
+  plan        BusinessPlan   @default(FREE)
+  
+  // Horaires d'ouverture (JSON)
+  openingHours Json?
+  
+  // SEO & Marketing
+  metaTitle       String?
+  metaDescription String?
+  featured        Boolean @default(false)
+  featuredUntil   DateTime?
+  
+  // Analytics
+  viewCount    Int @default(0)
+  clickCount   Int @default(0)
+  
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  category Category @relation(fields: [categoryId], references: [id])
+  owner    User     @relation(fields: [ownerId], references: [id])
+  ownerId  String
+  
+  @@map("businesses")
+}
+
+model Category {
+  id          String @id @default(cuid())
+  name        String
+  slug        String @unique
+  description String?
+  icon        String?
+  color       String?
+  
+  // Hiérarchie
+  parentId String?
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+  
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  businesses Business[]
+  
+  @@map("categories")
+}
+
+// ===== MODÈLES SYSTÈME =====
+
+model IngestionLog {
+  id        String           @id @default(cuid())
+  source    String           // Source du scraping (ex: "yellowpages.cm")
+  status    IngestionStatus  @default(PENDING)
+  
+  // Données
+  rawData   Json?            // Données brutes scrapées
+  processed Json?            // Données traitées
+  
+  // Résultats
+  businessId String?         // ID du business créé/mis à jour
+  errors     String[]  @default([])
+  
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("ingestion_logs")
+}
+
+model SystemConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("system_config")
+}
+
+// ===== ENUMS =====
+
+enum UserRole {
+  USER
+  BUSINESS
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum ApiPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum BusinessStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+enum BusinessPlan {
+  FREE
+  PREMIUM
+  FEATURED
+}
+
+enum IngestionStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+// ===== INDEX POUR PERFORMANCE =====
+
+// Index pour recherche géographique
+// @@index([latitude, longitude], map: "business_location_idx")
+// Index pour recherche textuelle
+// @@index([name, description], map: "business_search_idx")
+// Index pour filtres
+// @@index([categoryId, status, plan], map: "business_filters_idx")

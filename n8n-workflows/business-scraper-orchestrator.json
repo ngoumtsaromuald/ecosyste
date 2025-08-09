@@ -1,0 +1,354 @@
+{
+  "name": "Business Scraper Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily Scraping Schedule",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Orchestrator logic to manage scraping sessions\nconst today = new Date();\nconst dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.\n\n// Define scraping schedule\nconst scrapingPlan = {\n  0: ['cameroon-business-scraper'], // Sunday - Light scraping\n  1: ['cameroon-business-scraper', 'douala-business-scraper'], // Monday - Full scraping\n  2: ['douala-business-scraper'], // Tuesday - Douala focus\n  3: ['cameroon-business-scraper'], // Wednesday - General\n  4: ['douala-business-scraper'], // Thursday - Douala focus\n  5: ['cameroon-business-scraper', 'douala-business-scraper'], // Friday - Full scraping\n  6: [] // Saturday - Rest day\n};\n\nconst todaysScrapers = scrapingPlan[dayOfWeek] || [];\n\n// Create execution plan\nconst executionPlan = {\n  date: today.toISOString(),\n  day: dayOfWeek,\n  scrapers: todaysScrapers,\n  totalScrapers: todaysScrapers.length,\n  estimatedDuration: todaysScrapers.length * 15, // 15 minutes per scraper\n  status: 'scheduled'\n};\n\nreturn [{ json: executionPlan }];"
+      },
+      "id": "plan-execution",
+      "name": "Plan Scraping Execution",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-scrapers",
+              "leftValue": "={{ $json.totalScrapers }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-execution-needed",
+      "name": "Check if Execution Needed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:3001/v1/health/redis",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "none"
+      },
+      "id": "check-api-health",
+      "name": "Check API Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 240],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "api-healthy",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "validate-api-health",
+      "name": "Validate API Health",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 240],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "workflowId": "cameroon-business-scraper",
+        "source": "database"
+      },
+      "id": "execute-cameroon-scraper",
+      "name": "Execute Cameroon Scraper",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1340, 160],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "minutes"
+      },
+      "id": "wait-between-scrapers",
+      "name": "Wait Between Scrapers",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1560, 160],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "workflowId": "douala-business-scraper",
+        "source": "database"
+      },
+      "id": "execute-douala-scraper",
+      "name": "Execute Douala Scraper",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1780, 160],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate scraping session report\nconst startTime = new Date($input.first().json.date);\nconst endTime = new Date();\nconst duration = Math.round((endTime - startTime) / 1000 / 60); // minutes\n\nconst report = {\n  session_id: `scraping-${startTime.toISOString().split('T')[0]}`,\n  start_time: startTime.toISOString(),\n  end_time: endTime.toISOString(),\n  duration_minutes: duration,\n  scrapers_executed: $input.first().json.scrapers,\n  total_scrapers: $input.first().json.totalScrapers,\n  status: 'completed',\n  next_execution: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Tomorrow\n};\n\nreturn [{ json: report }];"
+      },
+      "id": "generate-report",
+      "name": "Generate Session Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 160],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:3001/v1/admin/scraping-reports",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "httpHeaderAuth": {
+          "name": "X-API-Key",
+          "value": "your-admin-api-key-here"
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "method": "POST"
+      },
+      "id": "save-report",
+      "name": "Save Report to API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2220, 160],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "message": "🚫 No scrapers scheduled for today ({{ new Date().toLocaleDateString() }})",
+        "options": {}
+      },
+      "id": "log-no-execution",
+      "name": "Log No Execution",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [900, 360],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "message": "❌ API health check failed. Scraping session aborted.",
+        "options": {}
+      },
+      "id": "log-api-unhealthy",
+      "name": "Log API Unhealthy",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1340, 320],
+      "executeOnce": false
+    }
+  ],
+  "connections": {
+    "schedule-trigger": {
+      "main": [
+        [
+          {
+            "node": "plan-execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "plan-execution": {
+      "main": [
+        [
+          {
+            "node": "check-execution-needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-execution-needed": {
+      "main": [
+        [
+          {
+            "node": "check-api-health",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "log-no-execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-api-health": {
+      "main": [
+        [
+          {
+            "node": "validate-api-health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-api-health": {
+      "main": [
+        [
+          {
+            "node": "execute-cameroon-scraper",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "log-api-unhealthy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "execute-cameroon-scraper": {
+      "main": [
+        [
+          {
+            "node": "wait-between-scrapers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wait-between-scrapers": {
+      "main": [
+        [
+          {
+            "node": "execute-douala-scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "execute-douala-scraper": {
+      "main": [
+        [
+          {
+            "node": "generate-report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate-report": {
+      "main": [
+        [
+          {
+            "node": "save-report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "business-scraper-orchestrator",
+  "tags": [
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "orchestrator",
+      "name": "orchestrator"
+    },
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "automation",
+      "name": "automation"
+    }
+  ]
+}
