@@ -52,13 +52,28 @@ export class BusinessService {
    * Récupérer toutes les entreprises avec filtres et pagination
    */
   async findAll(query: BusinessQueryDto): Promise<BusinessListResponse> {
-    const { page, limit, search, category, city, region, status, plan, featured, latitude, longitude, radius, sortBy, sortOrder } = query;
+    const { 
+      page = 1, 
+      limit = 20, 
+      search, 
+      category, 
+      city, 
+      region, 
+      status, 
+      plan, 
+      featured, 
+      latitude, 
+      longitude, 
+      radius, 
+      sortBy, 
+      sortOrder 
+    } = query;
     
     // Vérifier le cache Redis d'abord
     const cachedResult = await this.redisService.getCachedBusinesses(query);
     if (cachedResult) {
       this.logger.debug('Résultats récupérés depuis le cache Redis');
-      return cachedResult as BusinessListResponse;
+      return cachedResult as unknown as BusinessListResponse;
     }
     
     const skip = (page - 1) * limit;
@@ -111,7 +126,7 @@ export class BusinessService {
     // Requêtes parallèles pour les données et le total
     const [businesses, total] = await Promise.all([
       this.prisma.business.findMany({
-        where,
+        where: where as any,
         include: {
           category: true,
         },
@@ -119,7 +134,7 @@ export class BusinessService {
         take: limit,
         orderBy,
       }),
-      this.prisma.business.count({ where }),
+      this.prisma.business.count({ where: where as any }),
     ]);
 
     // Calcul de distance si recherche géographique
@@ -131,8 +146,11 @@ export class BusinessService {
           business.latitude, business.longitude
         );
       }
-      return { ...business, distance } as BusinessEntity;
-    });
+      return { 
+        ...business, 
+        distance
+      };
+    }) as unknown as BusinessEntity[];
 
     // Tri par distance si demandé
     if (sortBy === 'distance' && latitude && longitude) {
@@ -158,7 +176,7 @@ export class BusinessService {
     };
 
     // Mettre en cache le résultat (TTL: 5 minutes)
-    await this.redisService.cacheBusinesses(result, query, 300);
+    await this.redisService.cacheBusinesses(result.data, query, 300);
     this.logger.debug('Résultats mis en cache Redis');
 
     return result;
@@ -335,13 +353,22 @@ export class BusinessService {
 
       if (existingBusiness) {
         // Mettre à jour l'entreprise existante
+        const { category: _, coordinates, ...businessData } = extractedData;
         const updatedBusiness = await this.prisma.business.update({
           where: { id: existingBusiness.id },
           data: {
-            ...extractedData,
+            ...(extractedData.name && { name: extractedData.name }),
+            ...(businessData.description && { description: businessData.description }),
+            ...(businessData.email && { email: businessData.email }),
+            ...(businessData.phone && { phone: businessData.phone }),
+            ...(businessData.website && { website: businessData.website }),
+            ...(businessData.address && { address: businessData.address }),
+            ...(businessData.city && { city: businessData.city }),
+            ...(businessData.region && { region: businessData.region }),
+            ...(businessData.openingHours && { openingHours: businessData.openingHours }),
             categoryId: category.id,
-            latitude: extractedData.coordinates?.latitude,
-            longitude: extractedData.coordinates?.longitude,
+            latitude: coordinates?.latitude,
+            longitude: coordinates?.longitude,
           },
         });
         businessId = updatedBusiness.id;
@@ -351,14 +378,23 @@ export class BusinessService {
         const systemUser = await this.getOrCreateSystemUser();
         const slug = await this.generateUniqueSlug(extractedData.name!);
         
+        const { category: _, coordinates, ...businessData } = extractedData;
         const newBusiness = await this.prisma.business.create({
           data: {
-            ...extractedData,
+            name: extractedData.name!,
+            description: businessData.description,
+            email: businessData.email,
+            phone: businessData.phone,
+            website: businessData.website,
+            address: businessData.address,
+            city: businessData.city,
+            region: businessData.region,
+            openingHours: businessData.openingHours,
             slug,
             categoryId: category.id,
             ownerId: systemUser.id,
-            latitude: extractedData.coordinates?.latitude,
-            longitude: extractedData.coordinates?.longitude,
+            latitude: coordinates?.latitude,
+            longitude: coordinates?.longitude,
             status: BusinessStatus.PENDING, // Nécessite validation
           },
         });

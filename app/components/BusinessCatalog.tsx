@@ -6,6 +6,9 @@ import { BusinessCard } from './BusinessCard';
 import { Pagination } from './Pagination';
 import { LoadingSpinner } from './LoadingSpinner';
 import { AlertCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface Business {
   id: string;
@@ -102,35 +105,38 @@ export function BusinessCatalog() {
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Erreur de chargement</h3>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="btn-primary"
-        >
-          Réessayer
-        </button>
-      </div>
+      <Card className="text-center py-12">
+        <CardContent className="pt-6">
+          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <h3 className="text-lg font-medium mb-2">Erreur de chargement</h3>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button
+            onClick={() => window.location.reload()}
+          >
+            Réessayer
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
   if (businesses.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="text-6xl mb-4">🔍</div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune entreprise trouvée</h3>
-        <p className="text-gray-600 mb-4">
-          Essayez de modifier vos critères de recherche ou explorez d'autres catégories.
-        </p>
-        <button
-          onClick={() => window.location.href = '/'}
-          className="btn-secondary"
-        >
-          Voir toutes les entreprises
-        </button>
-      </div>
+      <Card className="text-center py-12">
+        <CardContent className="pt-6">
+          <div className="text-6xl mb-4">🔍</div>
+          <h3 className="text-lg font-medium mb-2">Aucune entreprise trouvée</h3>
+          <p className="text-muted-foreground mb-4">
+            Essayez de modifier vos critères de recherche ou explorez d'autres catégories.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = '/'}
+          >
+            Voir toutes les entreprises
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -138,18 +144,23 @@ export function BusinessCatalog() {
     <div>
       {/* En-tête des résultats */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-lg font-medium text-gray-900">
-            {meta?.total} entreprise{(meta?.total || 0) > 1 ? 's' : ''} trouvée{(meta?.total || 0) > 1 ? 's' : ''}
-          </h3>
-          <p className="text-sm text-gray-600">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-medium">
+              {meta?.total} entreprise{(meta?.total || 0) > 1 ? 's' : ''} trouvée{(meta?.total || 0) > 1 ? 's' : ''}
+            </h3>
+            <Badge variant="secondary" className="text-xs">
+              {meta?.total}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
             Page {meta?.page} sur {meta?.totalPages}
           </p>
         </div>
         
         {/* Options d'affichage */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Affichage:</span>
+          <span className="text-sm text-muted-foreground">Affichage:</span>
           <select 
             value={limit}
             onChange={(e) => {
@@ -158,7 +169,7 @@ export function BusinessCatalog() {
               params.set('page', '1'); // Reset à la page 1
               window.location.href = `/?${params.toString()}`;
             }}
-            className="text-sm border border-gray-300 rounded px-2 py-1"
+            className="h-8 px-3 py-1 text-sm border border-input bg-background rounded-md focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
           >
             <option value="12">12 par page</option>
             <option value="24">24 par page</option>

@@ -1,84 +1,147 @@
 'use client';
 
-import { Search, MapPin, Star } from 'lucide-react';
-import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { ArrowRight, Play } from 'lucide-react';
 
 export function HeroSection() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [location, setLocation] = useState('');
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Rediriger vers la recherche avec les paramètres
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('search', searchQuery);
-    if (location) params.set('city', location);
-    window.location.href = `/?${params.toString()}`;
-  };
-
   return (
-    <section className="gradient-bg text-white py-20">
-      <div className="container mx-auto px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-5xl font-bold mb-6">
-            Trouvez les meilleures entreprises du Cameroun
-          </h1>
-          <p className="text-xl mb-8 text-blue-100">
-            Découvrez, comparez et contactez facilement les services locaux près de chez vous
-          </p>
+    <section className="relative min-h-screen flex items-center justify-start overflow-hidden pt-16">
+      {/* Arrière-plan avec gradient moderne */}
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800" />
+      
+      {/* Overlay avec motif */}
+      <div className="absolute inset-0 bg-black/20" />
+      
+      {/* Zone dédiée pour animations futures (unicorn.studio ou équivalent) */}
+      <div 
+        id="hero-animation-container" 
+        className="absolute inset-0 z-10 pointer-events-none"
+        data-animation-ready="false"
+        aria-label="Container for future interactive animations"
+      >
+        {/* Particules flottantes animées */}
+        <motion.div 
+          className="absolute top-20 left-20 w-2 h-2 bg-white/30 rounded-full"
+          animate={{
+            y: [0, -20, 0],
+            opacity: [0.3, 0.8, 0.3]
+          }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        <motion.div 
+          className="absolute top-40 right-32 w-1 h-1 bg-pink-300/40 rounded-full"
+          animate={{
+            x: [0, 15, 0],
+            y: [0, -10, 0]
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 1
+          }}
+        />
+        <motion.div 
+          className="absolute bottom-32 left-1/4 w-3 h-3 bg-indigo-300/30 rounded-full"
+          animate={{
+            scale: [1, 1.5, 1],
+            opacity: [0.3, 0.7, 0.3]
+          }}
+          transition={{
+            duration: 2.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 2
+          }}
+        />
+        <motion.div 
+          className="absolute top-1/3 right-1/4 w-2 h-2 bg-purple-300/40 rounded-full"
+          animate={{
+            rotate: [0, 360],
+            scale: [1, 1.2, 1]
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "linear"
+          }}
+        />
+      </div>
 
-          {/* Barre de recherche */}
-          <form onSubmit={handleSearch} className="bg-white rounded-lg p-2 shadow-lg max-w-2xl mx-auto">
-            <div className="flex flex-col md:flex-row gap-2">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Que recherchez-vous ?"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 text-gray-900 rounded-lg border-0 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-              <div className="flex-1 relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Ville ou région"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 text-gray-900 rounded-lg border-0 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium transition-colors duration-200"
+      {/* Contenu principal aligné à gauche */}
+      <div className="relative z-20 container mx-auto px-4 py-20">
+        <div className="max-w-4xl text-white">
+          {/* Titre principal aligné en bas à gauche */}
+          <motion.h1 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 leading-tight"
+          >
+            <span className="block">
+              Toutes les entreprises
+            </span>
+            <span className="block">
+              locales.
+            </span>
+            <span className="block bg-gradient-to-r from-yellow-300 via-orange-300 to-pink-300 bg-clip-text text-transparent">
+              Une seule API.
+            </span>
+          </motion.h1>
+
+          {/* Sous-titre */}
+          <motion.p 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+            className="text-xl md:text-2xl mb-12 text-blue-100 max-w-3xl leading-relaxed"
+          >
+            ECOSYSTE connecte entreprises, développeurs et utilisateurs grâce à des données locales fiables et mises à jour.
+          </motion.p>
+
+          {/* Boutons CTA */}
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4, ease: 'easeOut' }}
+            className="flex flex-col sm:flex-row gap-4 mb-16"
+          >
+            <motion.div
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Button
+                size="lg"
+                className="h-14 px-8 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300"
               >
-                Rechercher
-              </button>
-            </div>
-          </form>
-
-          {/* Statistiques */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
-            <div className="text-center">
-              <div className="text-3xl font-bold mb-2">500+</div>
-              <div className="text-blue-100">Entreprises référencées</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold mb-2">50+</div>
-              <div className="text-blue-100">Catégories de services</div>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center mb-2">
-                <span className="text-3xl font-bold mr-2">4.8</span>
-                <Star className="w-6 h-6 fill-yellow-400 text-yellow-400" />
-              </div>
-              <div className="text-blue-100">Note moyenne</div>
-            </div>
-          </div>
+                Découvrir ECOSYSTE
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+            </motion.div>
+            
+            <motion.div
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Button
+                variant="outline"
+                size="lg"
+                className="h-14 px-8 bg-white/10 border-white/30 text-white hover:bg-white/20 font-semibold text-lg backdrop-blur-sm transition-all duration-300"
+              >
+                <Play className="w-5 h-5 mr-2" />
+                Essayer gratuitement
+              </Button>
+            </motion.div>
+          </motion.div>
         </div>
       </div>
+
+
     </section>
   );
 }

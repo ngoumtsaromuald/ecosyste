@@ -86,8 +86,8 @@ export default function AnalyticsPage() {
   const currentPeriodData = analyticsData.slice(-7);
   const previousPeriodData = analyticsData.slice(-14, -7);
   
-  const currentTotal = currentPeriodData.reduce((sum, item) => sum + item[selectedMetric as keyof AnalyticsData] as number, 0);
-  const previousTotal = previousPeriodData.reduce((sum, item) => sum + item[selectedMetric as keyof AnalyticsData] as number, 0);
+  const currentTotal = currentPeriodData.reduce((sum, item) => sum + Number(item[selectedMetric as keyof AnalyticsData]), 0);
+  const previousTotal = previousPeriodData.reduce((sum, item) => sum + Number(item[selectedMetric as keyof AnalyticsData]), 0);
   const variation = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
 
   const maxValue = Math.max(...currentPeriodData.map(item => item[selectedMetric as keyof AnalyticsData] as number));

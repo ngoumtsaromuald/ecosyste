@@ -1,38 +1,39 @@
 import { Suspense } from 'react';
-import { BusinessCatalog } from './components/BusinessCatalog';
-import { SearchFilters } from './components/SearchFilters';
+import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
-import { LoadingSpinner } from './components/LoadingSpinner';
+import { ValueProposition } from './components/ValueProposition';
+import { Features } from './components/Features';
+import { Pricing } from './components/Pricing';
+import { Testimonials } from './components/Testimonials';
+import { FinalCTA } from './components/FinalCTA';
+import { Footer } from './components/Footer';
 
 export default function HomePage() {
   return (
     <main className="min-h-screen">
-      {/* Section Hero */}
+      {/* Navigation Bar */}
+      <Navbar />
+      
+      {/* Hero Section */}
       <HeroSection />
       
-      {/* Section Catalogue */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Découvrez les entreprises du Cameroun
-          </h2>
-          <p className="text-gray-600 text-lg">
-            Trouvez facilement les services et entreprises près de chez vous
-          </p>
-        </div>
-
-        {/* Filtres de recherche */}
-        <div className="mb-8">
-          <Suspense fallback={<div className="h-20 bg-gray-100 rounded-lg animate-pulse" />}>
-            <SearchFilters />
-          </Suspense>
-        </div>
-
-        {/* Catalogue des entreprises */}
-        <Suspense fallback={<LoadingSpinner />}>
-          <BusinessCatalog />
-        </Suspense>
-      </div>
+      {/* Value Proposition Section */}
+      <ValueProposition />
+      
+      {/* Features Section */}
+      <Features />
+      
+      {/* Pricing Section */}
+      <Pricing />
+      
+      {/* Testimonials Section */}
+      <Testimonials />
+      
+      {/* Final CTA Section */}
+      <FinalCTA />
+      
+      {/* Footer */}
+      <Footer />
     </main>
   );
 }

@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import ErrorBoundary from './components/ErrorBoundary';
-import ClientOnly from './components/ClientOnly';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -25,19 +24,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
-      <body className={inter.className}>
-        <ClientOnly fallback={
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    <html lang="fr" className="dark">
+      <body className={`${inter.className} bg-background text-foreground`}>
+        <ErrorBoundary>
+          <div className="min-h-screen">
+            {children}
           </div>
-        }>
-          <ErrorBoundary>
-            <div className="min-h-screen bg-gray-50">
-              {children}
-            </div>
-          </ErrorBoundary>
-        </ClientOnly>
+        </ErrorBoundary>
       </body>
     </html>
   );

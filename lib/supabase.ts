@@ -77,7 +77,6 @@ export const businessQueries = {
 
     const { data, error, count } = await query
       .range(from, to)
-      .select('*', { count: 'exact' })
 
     return { data, error, count }
   },

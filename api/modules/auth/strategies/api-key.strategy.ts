@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-custom';
 import { Request } from 'express';
 import { AuthService } from '../auth.service';
+import { ApiKey, User } from '@prisma/client';
 
 @Injectable()
 export class ApiKeyStrategy extends PassportStrategy(Strategy, 'api-key') {
@@ -10,7 +11,7 @@ export class ApiKeyStrategy extends PassportStrategy(Strategy, 'api-key') {
     super();
   }
 
-  async validate(req: Request): Promise<any> {
+  async validate(req: Request): Promise<{ apiKey: ApiKey; user: User }> {
     const apiKey = this.extractApiKey(req);
     
     if (!apiKey) {
@@ -26,7 +27,7 @@ export class ApiKeyStrategy extends PassportStrategy(Strategy, 'api-key') {
     // Retourner les informations de l'API Key et de l'utilisateur
     return {
       apiKey: validApiKey,
-      user: validApiKey.user,
+      user: (validApiKey as any).user,
     };
   }
 

@@ -1,7 +1,7 @@
 # TODO:
 
-- [x] 1: Fix ChunkLoadError for app/layout.js timeout issue by optimizing webpack configuration (priority: High)
-- [x] 2: Resolve React hydration errors where server HTML doesn't match client rendering (priority: High)
-- [x] 3: Fix component rendering errors in NotFoundErrorBoundary (priority: High)
-- [x] 4: Resolve SVG data URL loading issues (net::ERR_ABORTED) (priority: Medium)
-- [x] 5: Address Next.js build and compilation problems (priority: Medium)
+- [x] fix-client-only: Supprimer le composant ClientOnly du layout qui cause les erreurs d'hydratation (priority: High)
+- [x] fix-webpack-config: Simplifier la configuration webpack dans next.config.js pour éviter les problèmes de chunks (priority: High)
+- [x] fix-csp-headers: Corriger les headers CSP qui peuvent bloquer le chargement des ressources (priority: Medium)
+- [x] test-fixes: Tester l'application après les corrections (priority: Medium)
+- [x] verify-dev-server: Vérifier que le serveur de développement fonctionne correctement (priority: Low)

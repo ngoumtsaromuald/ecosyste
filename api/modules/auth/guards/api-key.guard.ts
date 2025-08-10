@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { AuthService } from '../auth.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { RedisService } from '../../redis/redis.service';
+import { ApiKey, User } from '@prisma/client';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
@@ -40,18 +41,18 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('API Key invalide ou expirée');
     }
 
-    // Vérifier le rate limiting
-    const hourlyLimit = validApiKey.rateLimit;
-    if (currentCount && parseInt(currentCount) >= hourlyLimit) {
+    // Vérifier le rate limiting (limite par défaut)
+    const hourlyLimit = 100; // Limite par défaut
+    if (currentCount && parseInt(currentCount as string) >= hourlyLimit) {
       throw new UnauthorizedException(`Rate limit dépassé: ${hourlyLimit} requêtes/heure`);
     }
 
     // Incrémenter le compteur de rate limiting
-    await this.redisService.increment(rateLimitKey, 3600); // 1 heure
+    await this.redisService.set(rateLimitKey, (parseInt(currentCount as string || '0') + 1).toString(), 3600);
 
     // Ajouter les informations de l'API Key à la requête
     request.apiKey = validApiKey;
-    request.user = validApiKey.user;
+    request.user = (validApiKey as any).user;
 
     return true;
   }

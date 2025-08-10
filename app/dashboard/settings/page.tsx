@@ -17,7 +17,9 @@ import {
   Check,
   X,
   Globe,
-  Smartphone
+  Smartphone,
+  BarChart3,
+  TrendingUp
 } from 'lucide-react';
 
 interface UserProfile {

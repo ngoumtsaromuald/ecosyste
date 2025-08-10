@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Filter, X, MapPin, Star } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface Category {
   id: string;
@@ -48,7 +52,7 @@ export function SearchFilters() {
     // Mettre à jour l'URL
     const params = new URLSearchParams();
     Object.entries(newFilters).forEach(([k, v]) => {
-      if (v && v !== '' && v !== false) {
+      if (v !== '' && v !== false && v !== null && v !== undefined) {
         params.set(k, v.toString());
       }
     });
@@ -71,60 +75,62 @@ export function SearchFilters() {
   const activeFiltersCount = Object.values(filters).filter(v => v && v !== '' && v !== false && v !== 'createdAt').length;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-      {/* En-tête des filtres */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
-        >
-          <Filter className="w-5 h-5" />
-          <span className="font-medium">Filtres</span>
-          {activeFiltersCount > 0 && (
-            <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
-              {activeFiltersCount}
-            </span>
-          )}
-        </button>
-        
-        {activeFiltersCount > 0 && (
-          <button
-            onClick={clearFilters}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+    <Card className="shadow-md border-0">
+      <CardHeader className="border-b">
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 p-0 h-auto font-medium"
           >
-            <X className="w-4 h-4" />
-            Effacer tout
-          </button>
-        )}
-      </div>
+            <Filter className="w-5 h-5" />
+            <span>Filtres</span>
+            {activeFiltersCount > 0 && (
+              <Badge className="bg-blue-600 text-white">
+                {activeFiltersCount}
+              </Badge>
+            )}
+          </Button>
+          
+          {activeFiltersCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Effacer tout
+            </Button>
+          )}
+        </div>
+      </CardHeader>
 
-      {/* Contenu des filtres */}
       {showFilters && (
-        <div className="p-4 space-y-4">
+        <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Recherche textuelle */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
                 Recherche
               </label>
-              <input
+              <Input
                 type="text"
                 placeholder="Nom d'entreprise, service..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
             {/* Catégorie */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
                 Catégorie
               </label>
               <select
                 value={filters.category}
                 onChange={(e) => handleFilterChange('category', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full h-9 px-3 py-1 text-sm border border-input bg-background rounded-md focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
               >
                 <option value="">Toutes les catégories</option>
                 {categories.map((cat) => (
@@ -136,29 +142,28 @@ export function SearchFilters() {
             </div>
 
             {/* Ville */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <MapPin className="w-4 h-4 inline mr-1" />
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1">
+                <MapPin className="w-4 h-4" />
                 Ville
               </label>
-              <input
+              <Input
                 type="text"
                 placeholder="Douala, Yaoundé..."
                 value={filters.city}
                 onChange={(e) => handleFilterChange('city', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
             {/* Tri */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
                 Trier par
               </label>
               <select
                 value={filters.sortBy}
                 onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full h-9 px-3 py-1 text-sm border border-input bg-background rounded-md focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
               >
                 <option value="createdAt">Plus récent</option>
                 <option value="name">Nom A-Z</option>
@@ -169,20 +174,20 @@ export function SearchFilters() {
           </div>
 
           {/* Options supplémentaires */}
-          <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-200">
+          <div className="flex flex-wrap gap-4 pt-4 border-t">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={filters.featured}
                 onChange={(e) => handleFilterChange('featured', e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-primary border-input rounded focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               />
               <Star className="w-4 h-4 text-yellow-500" />
-              <span className="text-sm text-gray-700">Entreprises mises en avant</span>
+              <span className="text-sm">Entreprises mises en avant</span>
             </label>
           </div>
-        </div>
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
 }

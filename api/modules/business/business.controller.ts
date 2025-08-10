@@ -225,7 +225,7 @@ export class BusinessController {
     const business = await this.businessService.findOne(id);
     
     // Vérifier la propriété si pas admin
-    if (req.user.role !== UserRole.ADMIN && business.ownerId !== req.user.id) {
+    if (req.user.role !== UserRole.ADMIN && (business as any).ownerId !== req.user.id) {
       throw new Error('Accès refusé');
     }
 

@@ -114,7 +114,7 @@ export class AuthService {
   /**
    * Valider un utilisateur par JWT payload
    */
-  async validateUser(payload: JwtPayload): Promise<User | null> {
+  async validateUser(payload: JwtPayload): Promise<Omit<User, 'password'> | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
@@ -146,17 +146,17 @@ export class AuthService {
       return null;
     }
 
-    // Vérifier la date d'expiration
-    if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+    // Vérifier le quota mensuel
+    if (apiKey.monthlyUsage >= apiKey.monthlyQuota) {
       return null;
     }
 
-    // Mettre à jour la dernière utilisation
+    // Mettre à jour la dernière utilisation et l'usage
     await this.prisma.apiKey.update({
       where: { id: apiKey.id },
       data: { 
         lastUsedAt: new Date(),
-        usageCount: { increment: 1 },
+        monthlyUsage: { increment: 1 },
       },
     });
 
@@ -185,9 +185,9 @@ export class AuthService {
         key: hashedKey,
         plan,
         userId,
-        expiresAt,
-        rateLimit: limits.rateLimit,
-        quotaLimit: limits.quotaLimit,
+        monthlyQuota: limits.quotaLimit,
+        monthlyUsage: 0,
+        quotaResetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 jours
       },
     });
 
@@ -231,11 +231,11 @@ export class AuthService {
         plan: true,
         isActive: true,
         createdAt: true,
-        expiresAt: true,
+        updatedAt: true,
         lastUsedAt: true,
-        usageCount: true,
-        rateLimit: true,
-        quotaLimit: true,
+        monthlyQuota: true,
+        monthlyUsage: true,
+        quotaResetDate: true,
         userId: true,
       },
     });
@@ -289,8 +289,6 @@ export class AuthService {
     switch (plan) {
       case ApiPlan.FREE:
         return { rateLimit: 100, quotaLimit: 1000 }; // 100 req/h, 1000 req/mois
-      case ApiPlan.BASIC:
-        return { rateLimit: 500, quotaLimit: 10000 }; // 500 req/h, 10k req/mois
       case ApiPlan.PRO:
         return { rateLimit: 2000, quotaLimit: 100000 }; // 2k req/h, 100k req/mois
       case ApiPlan.ENTERPRISE:

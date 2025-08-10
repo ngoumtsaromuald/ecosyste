@@ -33,7 +33,11 @@ export class CategoryService {
       },
     });
 
-    return category;
+    return {
+      ...category,
+      description: category.description ?? undefined,
+      icon: category.icon ?? undefined
+    };
   }
 
   /**
@@ -76,6 +80,8 @@ export class CategoryService {
     return {
       data: categories.map(cat => ({
         ...cat,
+        description: cat.description ?? undefined,
+        icon: cat.icon ?? undefined,
         businessCount: cat._count.businesses
       })),
       meta: {
@@ -108,6 +114,8 @@ export class CategoryService {
 
     return {
       ...category,
+      description: category.description ?? undefined,
+      icon: category.icon ?? undefined,
       businessCount: category._count.businesses
     };
   }
@@ -131,6 +139,8 @@ export class CategoryService {
 
     return {
       ...category,
+      description: category.description ?? undefined,
+      icon: category.icon ?? undefined,
       businessCount: category._count.businesses
     };
   }
@@ -170,6 +180,8 @@ export class CategoryService {
 
     return {
       ...category,
+      description: category.description ?? undefined,
+      icon: category.icon ?? undefined,
       businessCount: category._count.businesses
     };
   }
